@@ -1,0 +1,56 @@
+{
+  "Comment": "Glue Job + Crawler Orchestration with pk_failure_lambda",
+  "StartAt": "StartGlueJob",
+  "States": {
+    "StartGlueJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "Pk_glue_job",
+        "Arguments": {
+          "--bucket.$": "$.bucket",
+          "--key.$": "$.key"
+        }
+      },
+      "Next": "StartCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "pk_failure_lambda"
+        }
+      ]
+    },
+    "StartCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "pk_crawler"
+      },
+      "Next": "PipelineSuccess",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "pk_failure_lambda"
+        }
+      ]
+    },
+    "PipelineSuccess": {
+      "Type": "Succeed"
+    },
+    "pk_failure_lambda": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:ap-south-1:960631463855:function:pk_failure_lambda",
+        "Payload": {
+          "ErrorInfo.$": "$"
+        }
+      },
+      "End": true
+    }
+  }
+}
